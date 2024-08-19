@@ -2,7 +2,9 @@
 
 ########################### configurations ###########################
 # some of these would be overwritten by arguments passed to the command
-players=("bitmovin" "dashjs" "shaka" "bola")
+# players=("bola1" "bola2" "bola3" "bola4" "bola5" "bola6" "bola7" "bola8" "bola9" "bola10" "bola11" "bola12" "bola13" "bola14" "bola15" "bola16" "bola17" "bola18" "bola19" "bola20")
+# players=("bola1" "bola2" "bola3" "bola4" "bola5")
+players=("bola1" "bola2" "bola3" "bola4" "bola5" "bola6" "bola7" "bola8" "bola9" "bola10")
 experiments=1
 shaperDurations=(15)   #s
 serverIngresses=(5000) #Kbps
@@ -28,6 +30,10 @@ endTime=""
 instancesType="m5ad.xlarge"
 title="stc"
 clientWarmupTime=1 #s
+abr="basic"
+medusa=0
+realtrace="4G"
+buffer_size=40
 ########################### /configurations ##########################
 
 ########################### functions ############################
@@ -60,6 +66,28 @@ for argument in "$@"; do
       experiments="${!nextArgumentIndex}"
       if [[ ! $experiments =~ ^[0-9]+$ ]]; then
         showError "Experiments parameter should follow by an integer number"
+      fi
+      ;;
+    "--abr")
+      nextArgumentIndex=$((argumentIndex + 2))
+      abr="${!nextArgumentIndex}"
+      ;;
+    "--realtrace")
+      nextArgumentIndex=$((argumentIndex + 2))
+      realtrace="${!nextArgumentIndex}"
+      ;;
+    "--medusa")
+      nextArgumentIndex=$((argumentIndex + 2))
+      medusa="${!nextArgumentIndex}"
+      if [[ ! $medusa =~ ^[0-9]+$ ]]; then
+        showError "Medusa parameter should follow by an integer number"
+      fi
+      ;;
+    "--bsize")
+      nextArgumentIndex=$((argumentIndex + 2))
+      buffer_size="${!nextArgumentIndex}"
+      if [[ ! $buffer_size =~ ^[0-9]+$ ]]; then
+        showError "Buffer size parameter should follow by an integer number"
       fi
       ;;
     "--shaper")
@@ -238,13 +266,14 @@ for publicIp in "${clientPublicIps[@]}"; do
   fi
   echo "$config" >"$id/config.json"
 
-  showMessage "Waiting for client network interface to be reachable [${players[playerIndex]}]"
+  showMessage "Waiting for client network interface to be reachable [${players[playerIndex]}] ***client***"$publicIp
   while ! nc -w5 -z "$publicIp" 22; do
     sleep 1
   done
 
   showMessage "Injecting scripts and configurations into client instance"
-  scp -oStrictHostKeyChecking=no -i "./$awsKey.pem" client/init.sh client/start.sh "$id/config.json" ec2-user@"$publicIp":/home/ec2-user
+  scp -oStrictHostKeyChecking=no -i "./$awsKey.pem" client/init.sh client/start.sh network/cascade_wondershaper.sh network/FCC${players[playerIndex]}.sh network/competition.sh network/amzonfcc.sh network/4G_trace_wondershaper.sh "$id/config.json" ec2-user@"$publicIp":/home/ec2-user
+  scp -rp -oStrictHostKeyChecking=no -i "./$awsKey.pem" client/AStream/ ec2-user@"$publicIp":/home/ec2-user
 
   ((playerIndex++))
 done
@@ -300,7 +329,7 @@ while [ $currentExperiment -lt $experiments ]; do
     --instance-ids $clientInstanceIds $serverInstanceId \
     --document-name "AWS-RunShellScript" \
     --comment "Start" \
-    --parameters commands="/home/ec2-user/start.sh" \
+    --parameters commands="/home/ec2-user/start.sh -a $abr -z $medusa -t $title -n $realtrace -b $buffer_size" \
     --output-s3-bucket-name "ppt-output" \
     --output-s3-key-prefix "start-out/$id" \
     --query "Command.CommandId" \
@@ -357,4 +386,6 @@ else
   echo $taskId
 fi
 
-cleanExit 0
+# sleep 45  # Wait 45 seconds to exit for collecting the data
+
+# cleanExit 0

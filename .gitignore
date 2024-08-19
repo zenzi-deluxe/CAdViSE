@@ -8,3 +8,4 @@ node_modules
 /server/dataset
 commands.md
 keys
+logs
